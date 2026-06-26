@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Para Mi Universo ✨</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050409;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        /* Lienzo de la experiencia */
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            cursor: grab;
+            z-index: 1;
+            touch-action: none;
+        }
+
+        #canvas-container:active {
+            cursor: grabbing;
+        }
+
+        /* Instrucción en la parte inferior */
+        .instruction {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            pointer-events: none;
+            font-weight: 500;
+            z-index: 5;
+            text-shadow: 0 0 10px rgba(0,0,0,0.9);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+    <div class="instruction">Arrastra la pantalla para orbitar y explorar el espacio</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // Nombre central integrado
+        const nombrePlaneta = "ALEXIMAR";
+
+        // Banco masivo de palabras lindas
+        const palabrasBase = [
+            "Hermosa", "Mi felicidad", "Mi musa", "Te amo", "Princesa", 
+            "Mi vida", "Perfecta", "Única", "Inteligente", "Mi luz", 
+            "Mi sonrisa", "Mi paz", "Te adoro", "Tierna", "Cariñosa", 
+            "Maravillosa", "Encantadora", "Mi todo", "Incondicional",
+            "Mi motivo", "Brillante", "Dulce", "Mágica", "Mi compañera",
+            "Preciosa", "Reina", "Mi adoración", "Espectacular", "Divina",
+            "Mi destino", "Mi alegría", "Inspiración", "Especial", "Mi tesoro",
+            "Radiante", "Mi ángel", "Alegre", "Fascinante", "Mi sueño",
+            "Sublime", "Te extraño", "Mi mundo", "Amor mío", "Única en mi vida",
+            "Mi refugio", "Extraordinaria", "Preciosa mía", "Sensacional"
+        ];
+
+        // Multiplicamos masivamente las palabras
+        const palabras = [];
+        for (let i = 0; i < 5; i++) {
+            palabras.push(...palabrasBase);
+        }
+
+        let scene, camera, renderer;
+        let isUserInteracting = false;
+        let pointerX = 0, pointerY = 0;
+        let lon = 0, lat = 0, phi = 0, theta = 0;
+        
+        let nombreSprite; 
+        let nubePalabrasGroup; 
+
+        const container = document.getElementById('canvas-container');
+
+        init();
+        animate();
+
+        function init() {
+            scene = new THREE.Scene();
+            // Nebulosa de fondo con color nativo oscuro y profundo
+            scene.background = new THREE.Color('#06040a'); 
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1100);
+
+            // GENERADOR NATIVO DE ESTRELLAS (Blindado contra bloqueos de internet)
+            const estrellasGeometry = new THREE.BufferGeometry();
+            const estrellasCount = 1500;
+            const estrellasPos = new Float32Array(estrellasCount * 3);
+
+            for(let i = 0; i < estrellasCount * 3; i++) {
+                estrellasPos[i] = (Math.random() - 0.5) * 800;
+            }
+
+            estrellasGeometry.setAttribute('position', new THREE.BufferAttribute(estrellasPos, 3));
+            const estrellasMaterial = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 1.5,
+                transparent: true,
+                opacity: 0.9
+            });
+
+            const estrellasParticulas = new THREE.Points(estrellasGeometry, estrellasMaterial);
+            scene.add(estrellasParticulas);
+
+            // CREACIÓN DEL NOMBRE "ALEXIMAR" EN EL CENTRO
+            const canvasNombre = document.createElement('canvas');
+            const ctxNombre = canvasNombre.getContext('2d');
+            canvasNombre.width = 1024; 
+            canvasNombre.height = 256;
+            
+            ctxNombre.font = '900 80px -apple-system, BlinkMacSystemFont, sans-serif';
+            ctxNombre.fillStyle = '#ffffff';
+            ctxNombre.textAlign = 'center';
+            
+            // Neon Glow Rosado de alta intensidad
+            ctxNombre.shadowColor = '#ff4757';
+            ctxNombre.shadowBlur = 30;
+            ctxNombre.strokeStyle = '#ff4757';
+            ctxNombre.lineWidth = 5;
+            
+            ctxNombre.strokeText(nombrePlaneta, 512, 140);
+            ctxNombre.fillText(nombrePlaneta, 512, 140);
+
+            const textureNombre = new THREE.CanvasTexture(canvasNombre);
+            const materialNombre = new THREE.SpriteMaterial({ map: textureNombre, transparent: true });
+            nombreSprite = new THREE.Sprite(materialNombre);
+            nombreSprite.scale.set(130, 32, 1); 
+            nombreSprite.position.set(0, 0, 0); 
+            scene.add(nombreSprite);
+
+            // NUBE MASIVA DE PALABRAS ALREDEDOR
+            nubePalabrasGroup = new THREE.Group();
+            scene.add(nubePalabrasGroup);
+
+            palabras.forEach((texto) => {
+                const canvasWord = document.createElement('canvas');
+                const ctxWord = canvasWord.getContext('2d');
+                canvasWord.width = 512;
+                canvasWord.height = 128;
+                
+                ctxWord.font = 'Bold 44px -apple-system, BlinkMacSystemFont, sans-serif';
+                ctxWord.fillStyle = '#ffffff';
+                ctxWord.textAlign = 'center';
+                ctxWord.shadowColor = '#ff4757';
+                ctxWord.shadowBlur = 18;
+                ctxWord.fillText(texto, 256, 75);
+
+                const textureWord = new THREE.CanvasTexture(canvasWord);
+                const spriteMaterial = new THREE.SpriteMaterial({ map: textureWord, transparent: true });
+                const spriteWord = new THREE.Sprite(spriteMaterial);
+
+                const angulo = Math.random() * Math.PI * 2;
+                const altura = (Math.random() - 0.5) * 320; 
+                const distancia = 120 + Math.random() * 160; 
+
+                spriteWord.position.x = Math.cos(angulo) * distancia;
+                spriteWord.position.z = Math.sin(angulo) * distancia;
+                spriteWord.position.y = altura;
+                
+                spriteWord.scale.set(55, 14, 1);
+                nubePalabrasGroup.add(spriteWord);
+            });
+
+            // Renderizador con soporte optimizado para móviles
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            // Eventos unificados para mouse y pantallas táctiles
+            container.addEventListener('pointerdown', onPointerDown, { passive: true });
+            window.addEventListener('resize', onWindowResize, false);
+        }
+
+        function onPointerDown(event) {
+            isUserInteracting = true;
+            pointerX = event.clientX;
+            pointerY = event.clientY;
+
+            document.addEventListener('pointermove', onPointerMove, { passive: true });
+            document.addEventListener('pointerup', onPointerUp, false);
+        }
+
+        function onPointerMove(event) {
+            const deltaX = event.clientX - pointerX;
+            const deltaY = event.clientY - pointerY;
+
+            lon -= deltaX * 0.2;
+            lat += deltaY * 0.2;
+
+            pointerX = event.clientX;
+            pointerY = event.clientY;
+        }
+
+        function onPointerUp() {
+            isUserInteracting = false;
+            document.removeEventListener('pointermove', onPointerMove);
+            document.removeEventListener('pointerup', onPointerUp);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            update();
+        }
+
+        function update() {
+            const tiempo = Date.now() * 0.001;
+
+            // Movimiento del Planeta Aleximar (Rotación y traslación sutil)
+            nombreSprite.rotation.z = Math.sin(tiempo * 0.25) * 0.04;
+            nombreSprite.position.y = Math.sin(tiempo * 1.2) * 5;
+            nombreSprite.position.x = Math.cos(tiempo * 0.7) * 3;
+
+            // Órbita de la mega nube de palabras
+            nubePalabrasGroup.rotation.y = tiempo * 0.04;
+            nubePalabrasGroup.rotation.x = Math.sin(tiempo * 0.08) * 0.04;
+
+            if (isUserInteracting === false) {
+                lon += 0.05; 
+            }
+
+            lat = Math.max(-85, Math.min(85, lat));
+            phi = THREE.MathUtils.degToRad(90 - lat);
+            theta = THREE.MathUtils.degToRad(lon);
+
+            camera.target = new THREE.Vector3();
+            camera.target.x = 500 * Math.sin(phi) * Math.cos(theta);
+            camera.target.y = 500 * Math.cos(phi);
+            camera.target.z = 500 * Math.sin(phi) * Math.sin(theta);
+
+            camera.lookAt(camera.target);
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
